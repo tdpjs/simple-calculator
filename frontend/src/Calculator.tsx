@@ -17,9 +17,11 @@ const Calculator: React.FC = () => {
         setVariables(prevVars => ({ ...prevVars, [varName]: value }));
     };
 
+    const PORT = process.env.PORT || 3001;
+
     const handleCalculate = async () => {
         try {
-            const response = await axios.post('http://localhost:3001/calculate', { expression, variables });
+            const response = await axios.post("https://simple-calculator-4xtb.onrender.com/calculate", { expression, variables });
             setResult(response.data.result);
         } catch (error) {
             setResult('Error: Invalid expression');
