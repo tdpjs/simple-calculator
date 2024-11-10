@@ -7,7 +7,7 @@ class RecursiveDescentParser {
         this.currentTokenIndex = 0;
     }
     tokenize(input) {
-        const tokenPattern = /\d+(\.\d+)?|[+*/^()-]|\b(sin|cos|tan|asin|acos|atan|atan2|cot|sec|csc|acot|asec|acsc|sqrt|log_\d+|ln|exp)\b|\b(pi|e|[a-zA-Z])\b/g;
+        const tokenPattern = /\d+(\.\d+)?|[+*/^()-]|\b(sin|cos|tan|asin|acos|atan|cot|sec|csc|sqrt|ln|exp|pi|e)\b/g;
         return input.match(tokenPattern) || [];
     }
     consume() {
@@ -48,55 +48,20 @@ class RecursiveDescentParser {
     }
     parsePrimary() {
         const token = this.peek();
-        if (/[a-zA-Z]/.test(token)) {
-            const varName = this.consume();
-            if (this.variables.hasOwnProperty(varName)) {
-                return { type: 'variable', name: varName };
+        // Handle functions like sin, cos, etc.
+        if (['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'cot', 'sec', 'csc', 'sqrt', 'ln', 'exp'].includes(token)) {
+            const func = this.consume();
+            if (this.consume() !== '(') {
+                throw new Error(`Expected '(' after function ${func}`);
             }
-        }
-        if (token === '-') {
-            // Lookahead to handle unary negation (e.g., "-2" or "(-2)")
-            this.consume(); // consume '-'
-            const nextToken = this.peek();
-            if (/\d+(\.\d+)?/.test(nextToken)) {
-                return -parseFloat(this.consume());
-            }
-            else if (nextToken === '(') {
-                this.consume(); // consume '('
-                const node = this.parseExpression();
-                this.consume(); // consume ')'
-                return ['-', node]; // Unary negation
-            }
-        }
-        if (/\d+(\.\d+)?/.test(token)) {
-            return parseFloat(this.consume());
-        }
-        else if (token === '(') {
-            this.consume();
             const node = this.parseExpression();
-            this.consume(); // consume ')'
-            return node;
-            // } else if (token.startsWith('log_')) {
-            //     const base: number = parseFloat(token.slice(4)); // Extract the base number after "log_"
-            //     console.log(`log_x(y) detected with base: ${base}`);
-            //     this.consume(); // consume 'log_x'
-            //     this.consume(); // consume '('
-            //     const node = this.parseExpression();
-            //     console.log('Parsed right operand for log:', node);
-            //     this.consume(); // consume ')'
-            //     return ['log', base, node]; // log base 'x' and number 'y'
-            // } else if (token === 'atan2') {
-            //     console.log('Parsing atan2 function');
-            //     this.consume(); // consume 'atan2'
-            //     this.consume(); // consume '('
-            //     const left = this.parseExpression(); // parse left operand
-            //     console.log('Parsed left operand for atan2:', left);
-            //     const right = this.parseExpression(); // parse right operand
-            //     console.log('Parsed right operand for atan2:', right);
-            //     this.consume(); // consume ')'
-            //     return ['atan2', left, right]; // atan2 with both operands
+            if (this.consume() !== ')') {
+                throw new Error(`Expected ')' after function argument in ${func}`);
+            }
+            return [func, node];
         }
-        else if (token === 'pi') {
+        // Handle constants like pi and e
+        if (token === 'pi') {
             this.consume();
             return Math.PI;
         }
@@ -104,38 +69,28 @@ class RecursiveDescentParser {
             this.consume();
             return Math.E;
         }
-        else if (token === 'sqrt') {
-            this.consume();
+        // Handle numbers
+        if (/\d+(\.\d+)?/.test(token)) {
+            return parseFloat(this.consume());
+        }
+        // Handle variables
+        if (/[a-zA-Z]/.test(token)) {
+            const varName = this.consume();
+            if (this.variables.hasOwnProperty(varName)) {
+                return { type: 'variable', name: varName };
+            }
+            throw new Error(`Unknown variable: ${varName}`);
+        }
+        // Handle expressions in parentheses
+        if (token === '(') {
             this.consume(); // consume '('
             const node = this.parseExpression();
-            this.consume(); // consume ')'
-            return ['sqrt', node]; // unary operator
+            if (this.consume() !== ')') {
+                throw new Error("Expected ')'");
+            }
+            return node;
         }
-        else if (token === 'sin' || token === 'cos' || token === 'tan' ||
-            token === 'asin' || token === 'acos' || token === 'atan' ||
-            token === 'cot' || token === 'sec' || token === 'acsc' ||
-            token === 'csc' || token === 'acot' || token === 'asec') {
-            const func = this.consume();
-            this.consume(); // consume '('
-            const node = this.parseExpression();
-            this.consume(); // consume ')'
-            return [func, node]; // unary operator
-        }
-        else if (token === 'ln') {
-            this.consume(); // consume 'ln'
-            this.consume(); // consume '('
-            const node = this.parseExpression();
-            this.consume(); // consume ')'
-            return ['ln', node]; // natural log
-        }
-        else if (token === 'exp') {
-            this.consume(); // consume 'exp'
-            this.consume(); // consume '('
-            const node = this.parseExpression();
-            this.consume(); // consume ')'
-            return ['exp', node]; // exponential function
-        }
-        throw new Error("Unexpected token");
+        throw new Error(`Unexpected token: ${token}`);
     }
     evaluate(node) {
         if (typeof node === 'number')
@@ -145,10 +100,9 @@ class RecursiveDescentParser {
         }
         if (Array.isArray(node)) {
             const [op, left, right] = node;
-            if (right === undefined) { // unary operator
+            if (right === undefined) { // Unary operator
                 const leftVal = this.evaluate(left);
                 switch (op) {
-                    case 'sqrt': return Math.sqrt(leftVal);
                     case 'sin': return Math.sin(leftVal);
                     case 'cos': return Math.cos(leftVal);
                     case 'tan': return Math.tan(leftVal);
@@ -158,35 +112,26 @@ class RecursiveDescentParser {
                     case 'cot': return 1 / Math.tan(leftVal);
                     case 'sec': return 1 / Math.cos(leftVal);
                     case 'csc': return 1 / Math.sin(leftVal);
-                    case 'acot': return Math.PI / 2 - Math.atan(leftVal); // acot(x) = π/2 - atan(x)
-                    case 'asec': return Math.acos(1 / leftVal); // asec(x) = acos(1/x)
-                    case 'acsc': return Math.asin(1 / leftVal); // acsc(x) = asin(1/x)
-                    case 'ln': return Math.log(leftVal); // natural log
-                    case 'exp': return Math.exp(leftVal); // exponential
-                    case '-': return -leftVal; // unary negation
-                    default: throw new Error("Unknown operator");
+                    case 'sqrt': return Math.sqrt(leftVal);
+                    case 'ln': return Math.log(leftVal);
+                    case 'exp': return Math.exp(leftVal);
+                    default: throw new Error(`Unknown operator: ${op}`);
                 }
             }
-            else { // binary operator
-                console.log("BINARY");
+            else { // Binary operator
                 const leftVal = this.evaluate(left);
                 const rightVal = this.evaluate(right);
-                console.log(leftVal);
-                console.log(rightVal);
-                console.log(Math.log(rightVal) / Math.log(leftVal));
                 switch (op) {
                     case '+': return leftVal + rightVal;
                     case '-': return leftVal - rightVal;
                     case '*': return leftVal * rightVal;
                     case '/': return leftVal / rightVal;
                     case '^': return Math.pow(leftVal, rightVal);
-                    // case 'atan2': return Math.atan2(leftVal, rightVal); // fix for two arguments
-                    // case 'log': return Math.log(rightVal) / Math.log(leftVal); // log base 'x' of 'y'
-                    default: throw new Error("Unknown operator");
+                    default: throw new Error(`Unknown operator: ${op}`);
                 }
             }
         }
-        return 0;
+        throw new Error("Invalid AST node");
     }
 }
 exports.default = RecursiveDescentParser;

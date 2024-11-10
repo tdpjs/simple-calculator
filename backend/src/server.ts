@@ -8,7 +8,7 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static files from 'backend/public' directory
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 
 // API route to handle the calculation request
 app.post('/calculate', (req: any, res: any) => {

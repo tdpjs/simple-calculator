@@ -11,7 +11,7 @@ const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 // Serve static files from 'backend/public' directory
-app.use(express_1.default.static(path_1.default.join(__dirname, 'public')));
+app.use(express_1.default.static('public'));
 // API route to handle the calculation request
 app.post('/calculate', (req, res) => {
     const { expression, variables } = req.body; // Accept variables from frontend
